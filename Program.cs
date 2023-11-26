@@ -1,104 +1,184 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 
 class Program
 {
+    static int screenWidth = 40;
+    static int screenHeight = 20;
+    static char snakeChar = '*';
+    static char foodChar = '@';
+
+    static List<int> snakeX = new List<int>();
+    static List<int> snakeY = new List<int>();
+    static int foodX;
+    static int foodY;
+    static int score = 0;
+    static bool gameOver = false;
+
     static void Main()
     {
-        int n = int.Parse(Console.ReadLine());
-        char[][] matrix = new char[n][];
-        int fishCatch = 0;
-        int[] position = new int[2];
-        Stack<int[]> previousPositions = new Stack<int[]>();
-        Queue<string> commands = new Queue<string>();
+        Console.Title = "Console Snake Game";
+        Console.CursorVisible = false;
 
-        for (int i = 0; i < n; i++)
+        InitializeGame();
+        Draw();
+        ConsoleKeyInfo keyInfo;
+
+        while (!gameOver)
         {
-            matrix[i] = Console.ReadLine().ToCharArray();
-            for (int j = 0; j < n; j++)
+            if (Console.KeyAvailable)
             {
-                if (matrix[i][j] == 'S')
-                {
-                    position[0] = i;
-                    position[1] = j;
-                }
+                keyInfo = Console.ReadKey(true);
+                UpdateDirection(keyInfo.Key);
             }
+
+            Move();
+            CheckCollision();
+            CheckFood();
+            Draw();
+            Thread.Sleep(100);
         }
 
-        while (true)
-        {
-            string command = Console.ReadLine();
+        Console.Clear();
+        Console.WriteLine("Game Over! Your score: " + score);
+    }
 
-            if (command == "collect the nets")
+    static void InitializeGame()
+    {
+        // Initialize snake
+        snakeX.Add(10);
+        snakeY.Add(10);
+
+        // Initialize food
+        GenerateFood();
+    }
+
+    static void Draw()
+    {
+        Console.Clear();
+
+        // Draw snake
+        for (int i = 0; i < snakeX.Count; i++)
+        {
+            Console.SetCursorPosition(snakeX[i], snakeY[i]);
+            Console.Write(snakeChar);
+        }
+
+        // Draw food
+        Console.SetCursorPosition(foodX, foodY);
+        Console.Write(foodChar);
+
+        // Draw score
+        Console.SetCursorPosition(0, screenHeight + 1);
+        Console.Write("Score: " + score);
+    }
+
+    static void Move()
+    {
+        int newHeadX = snakeX[0];
+        int newHeadY = snakeY[0];
+
+        switch (direction)
+        {
+            case Direction.Up:
+                newHeadY--;
                 break;
-
-            commands.Enqueue(command);
+            case Direction.Down:
+                newHeadY++;
+                break;
+            case Direction.Left:
+                newHeadX--;
+                break;
+            case Direction.Right:
+                newHeadX++;
+                break;
         }
 
-        while (commands.Count > 0)
-        {
-            string command = commands.Dequeue();
-            previousPositions.Push(new int[] { position[0], position[1] });
-            position = Move(position, command, n);
-            int x = position[0];
-            int y = position[1];
+        snakeX.Insert(0, newHeadX);
+        snakeY.Insert(0, newHeadY);
 
-            if (matrix[x][y] == '-')
-            {
-                continue;
-            }
-            else if (char.IsDigit(matrix[x][y]))
-            {
-                fishCatch += int.Parse(matrix[x][y].ToString());
-                matrix[x][y] = '-';
-            }
-            else if (matrix[x][y] == 'W')
-            {
-                Console.WriteLine($"You fell into a whirlpool! The ship sank and you lost the fish you caught. Last coordinates of the ship: [{x},{y}]");
-                return;
-            }
-        }
-
-        if (fishCatch >= 20)
+        // Remove last part of the tail
+        if (snakeX.Count > score + 1)
         {
-            Console.WriteLine("Success! You managed to reach the quota!");
-        }
-        else
-        {
-            int lackOfFish = 20 - fishCatch;
-            Console.WriteLine($"You didn't catch enough fish and didn't reach the quota! You need {lackOfFish} tons of fish more.");
-        }
-
-        Console.WriteLine($"Amount of fish caught: {fishCatch} tons.");
-
-        for (int i = 0; i < n; i++)
-        {
-            Console.WriteLine(new string(matrix[i]));
+            snakeX.RemoveAt(snakeX.Count - 1);
+            snakeY.RemoveAt(snakeY.Count - 1);
         }
     }
 
-    static int[] Move(int[] position, string command, int n)
+    static void CheckCollision()
     {
-        int x = position[0];
-        int y = position[1];
-
-        switch (command)
+        // Check collision with walls
+        if (snakeX[0] < 0 || snakeX[0] >= screenWidth || snakeY[0] < 0 || snakeY[0] >= screenHeight)
         {
-            case "up":
-                x = (x - 1 + n) % n;
-                break;
-            case "down":
-                x = (x + 1) % n;
-                break;
-            case "left":
-                y = (y - 1 + n) % n;
-                break;
-            case "right":
-                y = (y + 1) % n;
-                break;
+            gameOver = true;
         }
 
-        return new int[] { x, y };
+        // Check collision with self
+        for (int i = 1; i < snakeX.Count; i++)
+        {
+            if (snakeX[i] == snakeX[0] && snakeY[i] == snakeY[0])
+            {
+                gameOver = true;
+            }
+        }
+    }
+
+    static void CheckFood()
+    {
+        // Check if snake eats food
+        if (snakeX[0] == foodX && snakeY[0] == foodY)
+        {
+            score++;
+            GenerateFood();
+        }
+    }
+
+    static void GenerateFood()
+    {
+        Random random = new Random();
+        foodX = random.Next(0, screenWidth);
+        foodY = random.Next(0, screenHeight);
+
+        // Make sure food does not spawn on the snake
+        while (snakeX.Contains(foodX) && snakeY.Contains(foodY))
+        {
+            foodX = random.Next(0, screenWidth);
+            foodY = random.Next(0, screenHeight);
+        }
+    }
+
+    static Direction direction = Direction.Right;
+
+    static void UpdateDirection(ConsoleKey key)
+    {
+        switch (key)
+        {
+            case ConsoleKey.UpArrow:
+                if (direction != Direction.Down)
+                    direction = Direction.Up;
+                break;
+            case ConsoleKey.DownArrow:
+                if (direction != Direction.Up)
+                    direction = Direction.Down;
+                break;
+            case ConsoleKey.LeftArrow:
+                if (direction != Direction.Right)
+                    direction = Direction.Left;
+                break;
+            case ConsoleKey.RightArrow:
+                if (direction != Direction.Left)
+                    direction = Direction.Right;
+                break;
+        }
+    }
+
+    enum Direction
+    {
+        Up,
+        Down,
+        Left,
+        Right
     }
 }
-
